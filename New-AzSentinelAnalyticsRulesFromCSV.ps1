@@ -42,8 +42,8 @@ param (
 Function New-AzSentinelAnalyticsRulesFromCSV ($workspaceName, $resourceGroupName, $filename) {
     #Set up the authentication header
     $context = Get-AzContext
-    $profile = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile
-    $profileClient = New-Object -TypeName Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient -ArgumentList ($profile)
+    $profileInstance = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile
+    $profileClient = New-Object -TypeName Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient -ArgumentList ($profileInstance)
     $token = $profileClient.AcquireAccessToken($context.Subscription.TenantId)
     $authHeader = @{
         'Content-Type'  = 'application/json' 
@@ -53,7 +53,7 @@ Function New-AzSentinelAnalyticsRulesFromCSV ($workspaceName, $resourceGroupName
     $SubscriptionId = $context.Subscription.Id
 
     #Load all the rule templates so we can copy the information as needed.
-    $url = "https://management.azure.com/subscriptions/$($subscriptionId)/resourceGroups/$($ResourceGroupName)/providers/Microsoft.OperationalInsights/workspaces/$($WorkspaceName)/providers/Microsoft.SecurityInsights/alertruletemplates?api-version=2019-01-01-preview"
+    $url = "https://management.azure.com/subscriptions/$($subscriptionId)/resourceGroups/$($ResourceGroupName)/providers/Microsoft.OperationalInsights/workspaces/$($WorkspaceName)/providers/Microsoft.SecurityInsights/alertruletemplates?api-version=2024-03-01"
     $results = (Invoke-RestMethod -Method "Get" -Uri $url -Headers $authHeader ).value
 
     #Load the file information
@@ -93,13 +93,18 @@ Function New-AzSentinelAnalyticsRulesFromCSV ($workspaceName, $resourceGroupName
                             "properties" = @{
                                 "enabled"               = "true"
                                 "alertRuleTemplateName" = $template.name
+                                "alertDetailsOverride"  = $template.properties.alertDetailsOverride
                                 "displayName"           = $template.properties.displayName
                                 "description"           = $template.properties.description
+                                "entityMappings"        = $template.properties.entityMappings
+                                "eventGroupingSettings" = $template.properties.eventGroupingSettings
                                 "severity"              = $template.properties.severity
                                 "tactics"               = $template.properties.tactics
+                                "techniques"            = $template.properties.techniques
                                 "query"                 = $template.properties.query
                                 "queryFrequency"        = $template.properties.queryFrequency
                                 "queryPeriod"           = $template.properties.queryPeriod
+                                "requiredDataConnectors"= $template.properties.requiredDataConnectors
                                 "triggerOperator"       = $template.properties.triggerOperator
                                 "triggerThreshold"      = $template.properties.triggerThreshold
                                 "suppressionDuration"   = "PT5H"  #Azure Sentinel requires a value here 
@@ -136,10 +141,10 @@ Function New-AzSentinelAnalyticsRulesFromCSV ($workspaceName, $resourceGroupName
                     #Create the GUId for the alert and create it.
                     $guid = (New-Guid).Guid
                     #Create the URI we need to create the alert.
-                    $uri = "https://management.azure.com/subscriptions/$($subscriptionId)/resourceGroups/$($resourceGroupName)/providers/Microsoft.OperationalInsights/workspaces/$($workspaceName)/providers/Microsoft.SecurityInsights/alertRules/$($guid)?api-version=2019-01-01-preview"
+                    $uri = "https://management.azure.com/subscriptions/$($subscriptionId)/resourceGroups/$($resourceGroupName)/providers/Microsoft.OperationalInsights/workspaces/$($workspaceName)/providers/Microsoft.SecurityInsights/alertRules/$($guid)?api-version=2024-03-01"
                     try {
                         Write-Host "Attempting to create rule $($displayName)"
-                        $verdict = Invoke-RestMethod -Uri $uri -Method Put -Headers $authHeader -Body ($body | ConvertTo-Json -EnumsAsStrings)
+                        $verdict = Invoke-RestMethod -Uri $uri -Method Put -Headers $authHeader -Body ($body | ConvertTo-Json -Depth 6 -EnumsAsStrings)
                         Write-Output "Succeeded"
                     }
                     catch {
